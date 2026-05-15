@@ -10,6 +10,7 @@ import {
   checkAlternation,
   getNextWaveTargets,
 } from './utils/elliottWave'
+import { ELLIOTT_WAVE_TYPES } from './components/Toolbar'
 
 const MAX_IMPULSE_POINTS = 6
 const MAX_CORRECTIVE_POINTS = 4
@@ -26,6 +27,15 @@ export default function App() {
   const [error, setError] = useState(null)
   const [showFib, setShowFib] = useState(true)
   const [usingMock, setUsingMock] = useState(false)
+
+  // Drawing tool state
+  const [activeTool, setActiveTool] = useState('cursor')
+  const [elliottWaveType, setElliottWaveType] = useState(ELLIOTT_WAVE_TYPES[0])
+  const [drawings, setDrawings] = useState([])
+
+  // Indicator state
+  const [showStochRSI, setShowStochRSI] = useState(false)
+  const [showMACD, setShowMACD] = useState(false)
 
   const maxPoints = waveMode === 'impulse' ? MAX_IMPULSE_POINTS : MAX_CORRECTIVE_POINTS
   const activeWaveIndex = wavePoints.length < maxPoints ? wavePoints.length : null
@@ -52,10 +62,9 @@ export default function App() {
     }
   }, [ticker, timeframe])
 
-  // Auto-load on mount
   useEffect(() => { handleFetch() }, [])
 
-  // Keyboard shortcut: Ctrl+Z = undo
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
@@ -77,6 +86,7 @@ export default function App() {
 
   const handleUndo = useCallback(() => setWavePoints(prev => prev.slice(0, -1)), [])
   const handleReset = useCallback(() => setWavePoints([]), [])
+  const handleClearDrawings = useCallback(() => setDrawings([]), [])
 
   const handleSetWaveMode = useCallback((mode) => {
     setWaveMode(mode)
@@ -124,10 +134,22 @@ export default function App() {
         setShowFib={setShowFib}
         wavePoints={wavePoints}
         meta={meta}
+        // Drawing tools
+        activeTool={activeTool}
+        setActiveTool={setActiveTool}
+        elliottWaveType={elliottWaveType}
+        setElliottWaveType={setElliottWaveType}
+        drawings={drawings}
+        onClearDrawings={handleClearDrawings}
+        // Indicators
+        showStochRSI={showStochRSI}
+        setShowStochRSI={setShowStochRSI}
+        showMACD={showMACD}
+        setShowMACD={setShowMACD}
       />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Chart */}
+        {/* Chart area */}
         <div className="flex-1 relative overflow-hidden">
           {candles.length === 0 && !loading ? (
             <EmptyState onFetch={() => handleFetch()} />
@@ -136,16 +158,25 @@ export default function App() {
               candles={candles}
               wavePoints={wavePoints}
               waveMode={waveMode}
-              activeWaveIndex={activeWaveIndex}
-              onPointAdded={activeWaveIndex !== null ? handlePointAdded : null}
+              activeWaveIndex={activeTool === 'cursor' ? activeWaveIndex : null}
+              onPointAdded={activeTool === 'cursor' && activeWaveIndex !== null ? handlePointAdded : null}
               fibTargets={fibTargets}
               showFib={showFib}
+              // Drawing tools
+              activeTool={activeTool}
+              setActiveTool={setActiveTool}
+              elliottWaveType={elliottWaveType}
+              drawings={drawings}
+              setDrawings={setDrawings}
+              // Indicators
+              showStochRSI={showStochRSI}
+              showMACD={showMACD}
             />
           )}
 
           {/* Loading overlay */}
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-bg/60 backdrop-blur-sm">
+            <div className="absolute inset-0 flex items-center justify-center bg-bg/60 backdrop-blur-sm z-20">
               <div className="glass rounded-xl px-5 py-3 flex items-center gap-3">
                 <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
                 <span className="text-sm text-subtle font-mono">Mengambil data {ticker}.JK...</span>
@@ -155,20 +186,27 @@ export default function App() {
 
           {/* Mock badge */}
           {usingMock && !loading && (
-            <div className="absolute bottom-3 left-3 pointer-events-none">
+            <div className="absolute bottom-3 left-3 pointer-events-none z-10">
               <span className="tag-warn px-2 py-1 text-xs">⚠ DATA SIMULASI</span>
             </div>
           )}
 
           {/* Wave progress */}
           {candles.length > 0 && !loading && (
-            <div className="absolute bottom-3 right-3 glass rounded-xl px-3 py-2 pointer-events-none">
+            <div className="absolute bottom-3 right-3 glass rounded-xl px-3 py-2 pointer-events-none z-10">
               <WaveProgress
                 wavePoints={wavePoints}
                 maxPoints={maxPoints}
                 waveMode={waveMode}
                 activeWaveIndex={activeWaveIndex}
               />
+            </div>
+          )}
+
+          {/* Drawings count badge */}
+          {drawings.length > 0 && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 glass rounded-xl px-3 py-1.5 pointer-events-none z-10">
+              <span className="text-xs font-mono text-muted">{drawings.length} drawing{drawings.length > 1 ? 's' : ''}</span>
             </div>
           )}
         </div>
