@@ -5,6 +5,7 @@
 
 const INTERVAL_MAP = {
   '1H': '60m',
+  '2H': '1h',   // 2H uses 1h interval with aggregation
   '4H': '1h',
   '1D': '1d',
   '1W': '1wk',
@@ -13,10 +14,33 @@ const INTERVAL_MAP = {
 
 const RANGE_MAP = {
   '1H': '5d',
+  '2H': '30d',
   '4H': '60d',
   '1D': '2y',
   '1W': '5y',
   '1M': '10y',
+}
+
+const CANDLE_AGGREGATION = {
+  '2H': 2,
+}
+
+function aggregateCandles(candles, factor) {
+  if (!factor || factor <= 1) return candles
+  const result = []
+  for (let i = 0; i < candles.length; i += factor) {
+    const group = candles.slice(i, i + factor)
+    if (group.length === 0) continue
+    result.push({
+      time: group[0].time,
+      open: group[0].open,
+      high: Math.max(...group.map(c => c.high)),
+      low: Math.min(...group.map(c => c.low)),
+      close: group[group.length - 1].close,
+      volume: group.reduce((s, c) => s + (c.volume || 0), 0),
+    })
+  }
+  return result
 }
 
 export async function fetchStockData(ticker, timeframe = '1D') {
@@ -36,7 +60,10 @@ export async function fetchStockData(ticker, timeframe = '1D') {
     throw new Error('Data kosong — cek ticker')
   }
 
-  return { candles: data.candles, meta: data.meta }
+  const aggFactor = CANDLE_AGGREGATION[timeframe]
+  const candles = aggFactor ? aggregateCandles(data.candles, aggFactor) : data.candles
+
+  return { candles, meta: data.meta }
 }
 
 export function generateMockData(ticker = 'BBCA', bars = 300) {
